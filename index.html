@@ -3015,9 +3015,9 @@
                 liveRotC.height = sh;
                 liveRotX.save();
                 liveRotX.clearRect(0, 0, sw, sh);
-                // Rotate +90° to convert landscape buffer into portrait buffer
+                // Rotate -90° to convert landscape buffer into portrait buffer
                 liveRotX.translate(sw / 2, sh / 2);
-                liveRotX.rotate(Math.PI / 2);
+                liveRotX.rotate(-Math.PI / 2);
                 liveRotX.drawImage(liveVideo, -vw / 2, -vh / 2, vw, vh);
                 liveRotX.restore();
             }
@@ -3598,7 +3598,7 @@
         // PWA: register service worker for installability + reliable updates
         (function () {
             if (!('serviceWorker' in navigator)) return;
-            const __BUILD = 'v15';
+            const __BUILD = 'v16';
             try {
                 const bt = document.getElementById('build-tag');
                 if (bt) bt.textContent = __BUILD;
@@ -3632,7 +3632,7 @@
             window.forceAppUpdate = resetServiceWorkerAndReload;
 
             // Versioned SW URL forces Safari to re-fetch updated sw.js
-            const __SW_URL = 'sw.js?v=15';
+            const __SW_URL = 'sw.js?v=16';
             navigator.serviceWorker.register(__SW_URL).then((reg) => {
                 function trySkipWaiting() {
                     if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
