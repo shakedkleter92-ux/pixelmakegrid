@@ -2347,88 +2347,46 @@
             p31: ['#636663', '#87857c', '#bcad9f', '#f2b888', '#eb9661', '#b55945', '#734c44', '#3d3333', '#593e47', '#7a5859', '#a57855', '#de9f47', '#fdd179', '#fee1b8', '#d4c692', '#a6b04f', '#819447', '#44702d', '#2f4d2f', '#546756', '#89a477', '#a4c5af', '#cae6d9', '#f1f6f0', '#d5d6db', '#bbc3d0', '#96a9c1', '#6c81a1', '#405273', '#303843', '#14233a'],
         };
 
-        // Optional: load additional palette presets from PNG files in /color pallete/
-        // This lets you drop new palette PNGs into the folder without manually editing the arrays.
-        const PALETTE_IMAGE_SOURCES = [
-            { key: 'moldy_orange_7', label: 'Moldy', src: 'color pallete/moldy-orange-7-32x.png' },
-            { key: 'oil_6', label: 'Oil', src: 'color pallete/oil-6-32x.png' },
-            { key: 'midnight_ablaze', label: 'Midnight', src: 'color pallete/midnight-ablaze-32x.png' },
-            { key: 'slso8', label: 'SLSO8', src: 'color pallete/slso8-32x.png' },
-            { key: 'rust_gold_8', label: 'RustGold', src: 'color pallete/rust-gold-8-32x.png' },
-            { key: 'blessing', label: 'Blessing', src: 'color pallete/blessing-32x.png' },
-            { key: 'twilight_5', label: 'Twilight', src: 'color pallete/twilight-5-32x.png' },
-            { key: 'abyss_9', label: 'Abyss', src: 'color pallete/abyss-9-32x.png' },
-            { key: 'berry_nebula', label: 'Berry', src: 'color pallete/berry-nebula-32x.png' },
-            { key: 'chasm', label: 'Chasm', src: 'color pallete/chasm-32x.png' },
-            { key: 'citrink', label: 'Citrink', src: 'color pallete/citrink-32x.png' },
-            { key: 'cl8uds', label: 'CL8UDS', src: 'color pallete/cl8uds-32x.png' },
-            { key: 'eulbink', label: 'Eulbink', src: 'color pallete/eulbink-32x.png' },
-            { key: 'gamma_boy', label: 'Gamma', src: 'color pallete/gamma-boy-32x.png' },
-            { key: 'gothic_bit', label: 'Gothic', src: 'color pallete/gothic-bit-32x.png' },
-            { key: 'pollen8', label: 'Pollen8', src: 'color pallete/pollen8-32x.png' },
-            { key: 'pspixel', label: 'PSPixel', src: 'color pallete/pspixel-32x.png' },
-            { key: 'red_blood_pain', label: 'Blood', src: 'color pallete/red-blood-pain-32x.png' },
-            { key: 'vanilla_milkshake', label: 'Vanilla', src: 'color pallete/vanilla-milkshake-32x.png' },
-            { key: 'demichrome_2bit', label: 'Demichrome', src: 'color pallete/2bit-demichrome-32x.png' },
-            { key: 'p31', label: '31', src: 'color pallete/31-32x.png' },
-        ];
+        // Preset buttons are built directly from PALETTE_PRESETS (no PNG parsing / no async).
+        const PALETTE_LABELS = {
+            moldy_orange_7: 'Moldy',
+            oil_6: 'Oil',
+            midnight_ablaze: 'Midnight',
+            slso8: 'SLSO8',
+            rust_gold_8: 'RustGold',
+            blessing: 'Blessing',
+            twilight_5: 'Twilight',
+            abyss_9: 'Abyss',
+            berry_nebula: 'Berry',
+            chasm: 'Chasm',
+            citrink: 'Citrink',
+            cl8uds: 'CL8UDS',
+            eulbink: 'Eulbink',
+            gamma_boy: 'Gamma',
+            gothic_bit: 'Gothic',
+            pollen8: 'Pollen8',
+            pspixel: 'PSPixel',
+            red_blood_pain: 'Blood',
+            vanilla_milkshake: 'Vanilla',
+            demichrome_2bit: 'Demichrome',
+            p31: '31',
+        };
 
         function renderPresetBar() {
             const el = document.getElementById('palette-presets');
             if (!el) return;
             el.innerHTML = '';
-            PALETTE_IMAGE_SOURCES.forEach(({ key, label }) => {
-                if (!PALETTE_PRESETS[key]) return;
+            Object.keys(PALETTE_PRESETS).forEach((key) => {
+                const colors = PALETTE_PRESETS[key];
+                if (!Array.isArray(colors) || colors.length < 2) return;
                 const b = document.createElement('button');
                 b.type = 'button';
                 b.className = 'pal-tgt';
                 b.dataset.preset = key;
-                b.textContent = label;
+                b.textContent = PALETTE_LABELS[key] || key.replace(/_/g, ' ');
                 if (key === ACTIVE_PALETTE_KEY) b.classList.add('active');
                 el.appendChild(b);
             });
-        }
-
-        function extractPaletteFromImageData(imgData) {
-            const data = imgData.data;
-            const seen = new Set();
-            const out = [];
-            for (let i = 0; i < data.length; i += 4) {
-                const a = data[i + 3];
-                if (a < 10) continue;
-                const hex = rgbToHex(data[i], data[i + 1], data[i + 2]).toLowerCase();
-                if (!seen.has(hex)) { seen.add(hex); out.push(hex); }
-            }
-            return out;
-        }
-
-        function loadPaletteFromPng(src) {
-            return new Promise((resolve) => {
-                const img = new Image();
-                img.onload = () => {
-                    try {
-                        const c = document.createElement('canvas');
-                        c.width = img.width;
-                        c.height = img.height;
-                        const cx = c.getContext('2d', { willReadFrequently: true });
-                        cx.imageSmoothingEnabled = false;
-                        cx.drawImage(img, 0, 0);
-                        const colors = extractPaletteFromImageData(cx.getImageData(0, 0, c.width, c.height));
-                        resolve(colors);
-                    } catch (_) {
-                        resolve(null);
-                    }
-                };
-                img.onerror = () => resolve(null);
-                img.src = encodeURI(src);
-            });
-        }
-
-        async function hydratePalettesFromImages() {
-            for (const p of PALETTE_IMAGE_SOURCES) {
-                const cols = await loadPaletteFromPng(p.src);
-                if (cols && cols.length >= 2) PALETTE_PRESETS[p.key] = cols;
-            }
         }
 
         function hexToRgb(hex) {
@@ -2913,31 +2871,51 @@
         const liveOffC = document.createElement('canvas');
         const liveOffX = liveOffC.getContext('2d');
 
+        function getMainAspectRatioFallback() {
+            try {
+                const mainEl = document.getElementById('main');
+                if (mainEl) {
+                    const r = mainEl.getBoundingClientRect();
+                    if (r && r.width > 0 && r.height > 0) return r.width / r.height;
+                }
+            } catch (_) { }
+            const w = window.innerWidth || 1;
+            const h = window.innerHeight || 1;
+            return w / h;
+        }
+
         function getLiveVideoConstraints() {
             const mode = getLayoutMode();
             // Use "ideal" constraints; browser may pick closest supported.
+            const ar = getMainAspectRatioFallback();
+            // Pick a reasonable ideal resolution and let aspectRatio match the visible area
+            // to prevent browser-level crop/zoom on mobile.
+            const long = mode === 'desktop' ? 1920 : (mode === 'tablet' ? 1280 : 1280);
+            const isPortrait = ar < 1;
+            const idealW = Math.max(320, Math.round(isPortrait ? long * ar : long));
+            const idealH = Math.max(320, Math.round(isPortrait ? long : long / ar));
             if (mode === 'mobile') {
                 return {
                     facingMode: liveState.facingMode,
-                    width: { ideal: 720 },
-                    height: { ideal: 1280 },
-                    aspectRatio: { ideal: 9 / 16 }
+                    width: { ideal: idealW },
+                    height: { ideal: idealH },
+                    aspectRatio: { ideal: ar }
                 };
             }
             if (mode === 'tablet') {
                 return {
                     facingMode: liveState.facingMode,
-                    width: { ideal: 1280 },
-                    height: { ideal: 960 },
-                    aspectRatio: { ideal: 4 / 3 }
+                    width: { ideal: idealW },
+                    height: { ideal: idealH },
+                    aspectRatio: { ideal: ar }
                 };
             }
             // desktop
             return {
                 facingMode: liveState.facingMode,
-                width: { ideal: 1920 },
-                height: { ideal: 1080 },
-                aspectRatio: { ideal: 16 / 9 }
+                width: { ideal: idealW },
+                height: { ideal: idealH },
+                aspectRatio: { ideal: ar }
             };
         }
 
