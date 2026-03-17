@@ -2917,11 +2917,16 @@
             const idealW = Math.max(320, Math.round(isPortrait ? long * ar : long));
             const idealH = Math.max(320, Math.round(isPortrait ? long : long / ar));
             if (mode === 'mobile') {
-                // Mobile: don't force aspectRatio (some browsers crop/zoom aggressively)
+                // Mobile: prefer PORTRAIT capture (avoid manual rotation logic).
+                // Keep aspectRatio "ideal" (not exact) so browser can choose supported sizes.
+                const desiredAR = getAspectRatioValue(liveState.aspectRatio); // width/height, portrait < 1
+                const portraitW = Math.max(360, Math.round(960 * desiredAR)); // e.g. 540 for 9:16
+                const portraitH = 960;
                 return {
                     facingMode: liveState.facingMode,
-                    width: { ideal: idealW },
-                    height: { ideal: idealH },
+                    width: { ideal: portraitW },
+                    height: { ideal: portraitH },
+                    aspectRatio: { ideal: desiredAR }
                 };
             }
             if (mode === 'tablet') {
@@ -2945,15 +2950,12 @@
             if (!liveVideo.videoWidth) return null;
             const N = liveState.res;
             const vw = liveVideo.videoWidth, vh = liveVideo.videoHeight;
-            // Sample based on the CAMERA aspect ratio (no stretch, no forced UI ratio).
-            // This ensures we never "zoom/crop" to fit the UI — we letterbox instead.
             const targetRatio = vw / vh;
             // Resolution rule: keep total cells ~ N^2 (cols×rows ≈ N²).
             const sqrtR = Math.sqrt(targetRatio);
             const cols = Math.max(2, Math.round(N * sqrtR));
             const rows = Math.max(2, Math.round(N / sqrtR));
             liveOffC.width = cols; liveOffC.height = rows;
-            // Do NOT rotate frames here — Safari already provides correctly oriented frames for drawImage().
             const srcEl = liveVideo;
             const sw = vw;
             const sh = vh;
@@ -3531,10 +3533,61 @@
         syncPresetButtons();
         // Palettes are embedded; no async hydration needed.
 
-        // PWA: register service worker for installability
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js').catch(() => {});
-        }
+        // PWA: register service worker for installability + reliable updates
+        (function () {
+            if (!('serviceWorker' in navigator)) return;
+
+            function hasQueryFlag(name) {
+                try { return new URLSearchParams(location.search).has(name); } catch (_) { return false; }
+            }
+
+            async function resetServiceWorkerAndReload() {
+                try {
+                    const regs = await navigator.serviceWorker.getRegistrations();
+                    await Promise.all(regs.map(r => r.unregister()));
+                } catch (_) { }
+                try {
+                    if ('caches' in window) {
+                        const keys = await caches.keys();
+                        await Promise.all(keys.map(k => caches.delete(k)));
+                    }
+                } catch (_) { }
+                location.replace(location.pathname + '?v=' + Date.now());
+            }
+
+            // Escape hatch: open `...?__sw_reset=1` on iPhone to force a clean load
+            if (hasQueryFlag('__sw_reset')) {
+                resetServiceWorkerAndReload();
+                return;
+            }
+
+            // Expose for debugging from Safari (DevTools): `forceAppUpdate()`
+            window.forceAppUpdate = resetServiceWorkerAndReload;
+
+            navigator.serviceWorker.register('sw.js').then((reg) => {
+                function trySkipWaiting() {
+                    if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+                }
+                reg.addEventListener('updatefound', () => {
+                    const nw = reg.installing;
+                    if (!nw) return;
+                    nw.addEventListener('statechange', () => {
+                        if (nw.state === 'installed') trySkipWaiting();
+                    });
+                });
+
+                // If there's already an update waiting, activate it
+                trySkipWaiting();
+            }).catch(() => { });
+
+            // When the new SW takes control, reload once so the UI uses the new cached files
+            let reloading = false;
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (reloading) return;
+                reloading = true;
+                location.reload();
+            });
+        })();
 
         // Add to home screen prompt — shown on mobile when opening from link (not when already launched from icon)
         (function () {
