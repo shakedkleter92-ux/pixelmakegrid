@@ -1224,6 +1224,8 @@
             align-items: center;
             justify-content: center;
             padding: 0;
+            /* Must stay above the sliding panel when it's open */
+            z-index: 130
         }
         #mob-undo svg {
             width: 22px;
@@ -3204,7 +3206,8 @@
                 // Keep Download available in Draw/Upload even when panel is open.
                 // In Live we download via the preview modal (from shutter/record stop), so keep it hidden.
                 mobDl.style.display = (state.mode === 'live') ? 'none' : 'block';
-                if (mobUndo) mobUndo.style.display = 'none';
+                // Keep Undo available in Draw even when panel is open.
+                if (mobUndo) mobUndo.style.display = (state.mode === 'draw') ? 'flex' : 'none';
                 if (mobRatio) mobRatio.style.display = 'none';
                 if (modeBtn) modeBtn.style.display = 'none';
                 return;
