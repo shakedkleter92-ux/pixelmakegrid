@@ -2892,6 +2892,18 @@
 
         const liveOffC = document.createElement('canvas');
         const liveOffX = liveOffC.getContext('2d');
+        const liveRotC = document.createElement('canvas');
+        const liveRotX = liveRotC.getContext('2d');
+
+        function getScreenOrientationAngle() {
+            // Prefer Screen Orientation API, fall back to legacy iOS window.orientation
+            try {
+                if (screen && screen.orientation && typeof screen.orientation.angle === 'number') return screen.orientation.angle;
+            } catch (_) { }
+            const a = window.orientation;
+            if (typeof a === 'number') return a;
+            return 0;
+        }
 
         function getMainAspectRatioFallback() {
             try {
@@ -2917,11 +2929,20 @@
             const idealW = Math.max(320, Math.round(isPortrait ? long * ar : long));
             const idealH = Math.max(320, Math.round(isPortrait ? long : long / ar));
             if (mode === 'mobile') {
-                // Mobile: don't force aspectRatio (some browsers crop/zoom aggressively)
+                // Mobile: try to REQUEST portrait capture (camera apps behavior).
+                // iOS may ignore these, but when honored it fixes the "landscape buffer" issue.
+                const desiredAR = getAspectRatioValue(liveState.aspectRatio || '9:16'); // width/height (portrait < 1)
                 return {
                     facingMode: liveState.facingMode,
-                    width: { ideal: idealW },
-                    height: { ideal: idealH },
+                    width: { ideal: 720 },
+                    height: { ideal: 1280 },
+                    aspectRatio: { ideal: desiredAR },
+                    // Provide additional common portrait targets as hints
+                    advanced: [
+                        { width: 720, height: 1280 },
+                        { width: 1080, height: 1920 },
+                        { width: 640, height: 1136 },
+                    ]
                 };
             }
             if (mode === 'tablet') {
@@ -2953,10 +2974,31 @@
             const cols = Math.max(2, Math.round(N * sqrtR));
             const rows = Math.max(2, Math.round(N / sqrtR));
             liveOffC.width = cols; liveOffC.height = rows;
-            // Do NOT rotate frames here — Safari already provides correctly oriented frames for drawImage().
-            const srcEl = liveVideo;
-            const sw = vw;
-            const sh = vh;
+            // Fallback: if iOS delivers a landscape buffer while UI is portrait, rotate for sampling.
+            // This does NOT crop and does NOT affect the camera stream, only the canvas sampling.
+            const mode = getLayoutMode();
+            const wantPortraitUI = (mode === 'mobile') && (window.innerHeight >= window.innerWidth);
+            const needsRotate = wantPortraitUI && (vw > vh);
+            let srcEl = liveVideo;
+            let sw = vw;
+            let sh = vh;
+            if (needsRotate) {
+                // Pick direction by device orientation angle (0/180 portrait, 90/270 landscape).
+                // In portrait, we want to rotate the buffer into portrait.
+                const ang = ((getScreenOrientationAngle() % 360) + 360) % 360;
+                const dir = (ang === 0 || ang === 180) ? -1 : 1; // default portrait fix
+                sw = vh;
+                sh = vw;
+                liveRotC.width = sw;
+                liveRotC.height = sh;
+                liveRotX.save();
+                liveRotX.clearRect(0, 0, sw, sh);
+                liveRotX.translate(sw / 2, sh / 2);
+                liveRotX.rotate(dir * (Math.PI / 2));
+                liveRotX.drawImage(liveVideo, -vw / 2, -vh / 2, vw, vh);
+                liveRotX.restore();
+                srcEl = liveRotC;
+            }
 
             // Contain: show full camera frame (no crop), allow letterbox.
             const scale = Math.min(cols / sw, rows / sh);
@@ -3534,7 +3576,7 @@
         // PWA: register service worker for installability + reliable updates
         (function () {
             if (!('serviceWorker' in navigator)) return;
-            const __BUILD = 'v18';
+            const __BUILD = 'v19';
             try {
                 const bt = document.getElementById('build-tag');
                 if (bt) bt.textContent = __BUILD;
@@ -3568,7 +3610,7 @@
             window.forceAppUpdate = resetServiceWorkerAndReload;
 
             // Versioned SW URL forces Safari to re-fetch updated sw.js
-            const __SW_URL = 'sw.js?v=18';
+            const __SW_URL = 'sw.js?v=19';
             navigator.serviceWorker.register(__SW_URL).then((reg) => {
                 function trySkipWaiting() {
                     if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
