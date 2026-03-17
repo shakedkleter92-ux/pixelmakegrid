@@ -1,5 +1,5 @@
 // Minimal service worker so the app can be installed (PWA)
-const CACHE = 'pixel-maker-v10';
+const CACHE = 'pixel-maker-v11';
 
 self.addEventListener('install', (e) => {
   e.waitUntil(
@@ -46,7 +46,7 @@ self.addEventListener('fetch', (e) => {
   // Navigation (HTML): network-first so updates show up quickly, with cache fallback offline.
   if (req.mode === 'navigate') {
     e.respondWith(
-      fetch(req)
+      fetch(req, { cache: 'no-store' })
         .then((res) => {
           const copy = res.clone();
           caches.open(CACHE).then((c) => c.put('./index.html', copy)).catch(() => {});
