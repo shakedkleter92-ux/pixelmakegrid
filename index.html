@@ -1745,11 +1745,28 @@
             }
 
             if (isLive) {
-                // Live preview: do not stretch the frame.
-                // Render into the full available area; the mosaic itself letterboxes as needed.
-                var cw = Math.max(1, W);
-                var ch = Math.max(1, H);
-                var coverKey = 'screen:' + cw + 'x' + ch;
+                // Live preview on mobile: render into a portrait UI frame (9:16 by default)
+                // so the grid doesn't become tiny. The camera itself is still drawn "contain"
+                // inside the grid (no crop).
+                var frameW = Math.max(1, W);
+                var frameH = Math.max(1, H);
+                var dx = 0, dy = 0;
+                if (isMobileLayout()) {
+                    var desiredAR = getAspectRatioValue(liveState.aspectRatio || '9:16'); // width/height
+                    if (desiredAR > 1) desiredAR = 1 / desiredAR;
+                    var screenAR = frameW / frameH;
+                    if (screenAR > desiredAR) {
+                        frameW = Math.max(1, Math.round(frameH * desiredAR));
+                        dx = Math.round((W - frameW) / 2);
+                    } else {
+                        frameH = Math.max(1, Math.round(frameW / desiredAR));
+                        dy = Math.round((H - frameH) / 2);
+                    }
+                }
+
+                var cw = frameW;
+                var ch = frameH;
+                var coverKey = 'screen:' + cw + 'x' + ch + ':m=' + (isMobileLayout() ? 'm' : 'd');
                 if (!liveCoverCanvas || liveCoverLastRatio !== coverKey) {
                     liveCoverCanvas = document.createElement('canvas');
                     liveCoverLastRatio = coverKey;
@@ -1764,7 +1781,7 @@
                 gctx.fillStyle = state.bg;
                 gctx.fillRect(0, 0, W, H);
                 gctx.imageSmoothingEnabled = false;
-                gctx.drawImage(liveCoverCanvas, 0, 0, W, H);
+                gctx.drawImage(liveCoverCanvas, dx, dy, cw, ch);
                 gctx.imageSmoothingEnabled = true;
                 return;
             }
@@ -2966,9 +2983,15 @@
             if (!liveVideo.videoWidth) return null;
             const N = liveState.res;
             const vw = liveVideo.videoWidth, vh = liveVideo.videoHeight;
-            // Sample based on the CAMERA aspect ratio (no stretch, no forced UI ratio).
-            // This ensures we never "zoom/crop" to fit the UI — we letterbox instead.
-            const targetRatio = vw / vh;
+            // Mobile: build the grid to the UI ratio so it fills the portrait frame.
+            // Camera pixels are still drawn "contain" into that grid (no crop).
+            const mode = getLayoutMode();
+            let targetRatio = vw / vh;
+            if (mode === 'mobile') {
+                let desiredAR = getAspectRatioValue(liveState.aspectRatio || '9:16');
+                if (desiredAR > 1) desiredAR = 1 / desiredAR;
+                targetRatio = desiredAR;
+            }
             // Resolution rule: keep total cells ~ N^2 (cols×rows ≈ N²).
             const sqrtR = Math.sqrt(targetRatio);
             const cols = Math.max(2, Math.round(N * sqrtR));
@@ -2976,7 +2999,6 @@
             liveOffC.width = cols; liveOffC.height = rows;
             // Fallback: if iOS delivers a landscape buffer while UI is portrait, rotate for sampling.
             // This does NOT crop and does NOT affect the camera stream, only the canvas sampling.
-            const mode = getLayoutMode();
             const wantPortraitUI = (mode === 'mobile') && (window.innerHeight >= window.innerWidth);
             const needsRotate = wantPortraitUI && (vw > vh);
             let srcEl = liveVideo;
@@ -3576,7 +3598,7 @@
         // PWA: register service worker for installability + reliable updates
         (function () {
             if (!('serviceWorker' in navigator)) return;
-            const __BUILD = 'v19';
+            const __BUILD = 'v20';
             try {
                 const bt = document.getElementById('build-tag');
                 if (bt) bt.textContent = __BUILD;
@@ -3610,7 +3632,7 @@
             window.forceAppUpdate = resetServiceWorkerAndReload;
 
             // Versioned SW URL forces Safari to re-fetch updated sw.js
-            const __SW_URL = 'sw.js?v=19';
+            const __SW_URL = 'sw.js?v=20';
             navigator.serviceWorker.register(__SW_URL).then((reg) => {
                 function trySkipWaiting() {
                     if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
