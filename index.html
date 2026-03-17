@@ -1745,11 +1745,30 @@
             }
 
             if (isLive) {
-                // Live preview: do not stretch the frame.
-                // Render into the full available area; the mosaic itself letterboxes as needed.
-                var cw = Math.max(1, W);
-                var ch = Math.max(1, H);
-                var coverKey = 'screen:' + cw + 'x' + ch;
+                // Live preview: camera-app behavior on mobile.
+                // We render into a PORTRAIT frame (9:16 by default) that fits inside #main,
+                // without cropping the camera (mosaic will letterbox inside the frame).
+                var frameW = Math.max(1, W);
+                var frameH = Math.max(1, H);
+                var dx = 0, dy = 0;
+                if (isMobileLayout()) {
+                    var desiredAR = getAspectRatioValue(liveState.aspectRatio || '9:16'); // width/height
+                    if (desiredAR > 1) desiredAR = 1 / desiredAR; // keep portrait UI
+                    var screenAR = frameW / frameH;
+                    if (screenAR > desiredAR) {
+                        // Screen too wide -> fit by height
+                        frameW = Math.max(1, Math.round(frameH * desiredAR));
+                        dx = Math.round((W - frameW) / 2);
+                    } else {
+                        // Screen too tall -> fit by width
+                        frameH = Math.max(1, Math.round(frameW / desiredAR));
+                        dy = Math.round((H - frameH) / 2);
+                    }
+                }
+
+                var cw = frameW;
+                var ch = frameH;
+                var coverKey = 'screen:' + cw + 'x' + ch + ':m=' + (isMobileLayout() ? 'm' : 'd');
                 if (!liveCoverCanvas || liveCoverLastRatio !== coverKey) {
                     liveCoverCanvas = document.createElement('canvas');
                     liveCoverLastRatio = coverKey;
@@ -1764,7 +1783,20 @@
                 gctx.fillStyle = state.bg;
                 gctx.fillRect(0, 0, W, H);
                 gctx.imageSmoothingEnabled = false;
-                gctx.drawImage(liveCoverCanvas, 0, 0, W, H);
+                gctx.drawImage(liveCoverCanvas, dx, dy, cw, ch);
+                // Tiny debug overlay for mobile live: helps verify ratios on device.
+                if (isMobileLayout()) {
+                    gctx.save();
+                    gctx.fillStyle = 'rgba(255,255,255,0.72)';
+                    gctx.fillRect(8, 8, 220, 44);
+                    gctx.fillStyle = '#111';
+                    gctx.font = '12px ui-monospace, SFMono-Regular, Menlo, monospace';
+                    gctx.fillText('LIVE ' + String(liveState.aspectRatio || '9:16') + '  ' + state.cols + 'x' + state.rows, 14, 26);
+                    try {
+                        gctx.fillText('canvas ' + W + 'x' + H + ' frame ' + cw + 'x' + ch, 14, 42);
+                    } catch (_) { }
+                    gctx.restore();
+                }
                 gctx.imageSmoothingEnabled = true;
                 return;
             }
@@ -3547,7 +3579,7 @@
         // PWA: register service worker for installability + reliable updates
         (function () {
             if (!('serviceWorker' in navigator)) return;
-            const __BUILD = 'v13';
+            const __BUILD = 'v14';
             try {
                 const bt = document.getElementById('build-tag');
                 if (bt) bt.textContent = __BUILD;
@@ -3581,7 +3613,7 @@
             window.forceAppUpdate = resetServiceWorkerAndReload;
 
             // Versioned SW URL forces Safari to re-fetch updated sw.js
-            const __SW_URL = 'sw.js?v=13';
+            const __SW_URL = 'sw.js?v=14';
             navigator.serviceWorker.register(__SW_URL).then((reg) => {
                 function trySkipWaiting() {
                     if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
