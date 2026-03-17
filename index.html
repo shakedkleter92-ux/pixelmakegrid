@@ -2526,6 +2526,21 @@
         const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth <= 700;
 
         function dl(cnv, name) {
+            // Desktop: prefer synchronous data URL download to avoid losing the user-gesture
+            // (some browsers block async-toBlob triggered downloads from a modal button).
+            if (!isMobile) {
+                try {
+                    const url = cnv.toDataURL('image/png');
+                    const a = document.createElement('a');
+                    a.download = name;
+                    a.href = url;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    return;
+                } catch (_) { /* fall back to toBlob */ }
+            }
+
             cnv.toBlob(blob => {
                 if (!blob) return;
                 // On mobile, try Web Share API first (native share sheet)
@@ -2539,7 +2554,7 @@
                         return;
                     }
                 }
-                // Desktop or share not supported: standard download
+                // Fallback: standard blob download
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.download = name;
