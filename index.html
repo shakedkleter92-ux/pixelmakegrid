@@ -1745,30 +1745,11 @@
             }
 
             if (isLive) {
-                // Live preview: camera-app behavior on mobile.
-                // We render into a PORTRAIT frame (9:16 by default) that fits inside #main,
-                // without cropping the camera (mosaic will letterbox inside the frame).
-                var frameW = Math.max(1, W);
-                var frameH = Math.max(1, H);
-                var dx = 0, dy = 0;
-                if (isMobileLayout()) {
-                    var desiredAR = getAspectRatioValue(liveState.aspectRatio || '9:16'); // width/height
-                    if (desiredAR > 1) desiredAR = 1 / desiredAR; // keep portrait UI
-                    var screenAR = frameW / frameH;
-                    if (screenAR > desiredAR) {
-                        // Screen too wide -> fit by height
-                        frameW = Math.max(1, Math.round(frameH * desiredAR));
-                        dx = Math.round((W - frameW) / 2);
-                    } else {
-                        // Screen too tall -> fit by width
-                        frameH = Math.max(1, Math.round(frameW / desiredAR));
-                        dy = Math.round((H - frameH) / 2);
-                    }
-                }
-
-                var cw = frameW;
-                var ch = frameH;
-                var coverKey = 'screen:' + cw + 'x' + ch + ':m=' + (isMobileLayout() ? 'm' : 'd');
+                // Live preview: do not stretch the frame.
+                // Render into the full available area; the mosaic itself letterboxes as needed.
+                var cw = Math.max(1, W);
+                var ch = Math.max(1, H);
+                var coverKey = 'screen:' + cw + 'x' + ch;
                 if (!liveCoverCanvas || liveCoverLastRatio !== coverKey) {
                     liveCoverCanvas = document.createElement('canvas');
                     liveCoverLastRatio = coverKey;
@@ -1783,22 +1764,7 @@
                 gctx.fillStyle = state.bg;
                 gctx.fillRect(0, 0, W, H);
                 gctx.imageSmoothingEnabled = false;
-                gctx.drawImage(liveCoverCanvas, dx, dy, cw, ch);
-                // Tiny debug overlay for mobile live: helps verify ratios on device.
-                if (isMobileLayout()) {
-                    gctx.save();
-                    gctx.fillStyle = 'rgba(255,255,255,0.72)';
-                    gctx.fillRect(8, 8, 220, 44);
-                    gctx.fillStyle = '#111';
-                    gctx.font = '12px ui-monospace, SFMono-Regular, Menlo, monospace';
-                    const rotFlag = (window.innerHeight >= window.innerWidth && liveVideo && liveVideo.videoWidth && liveVideo.videoHeight && liveVideo.videoWidth > liveVideo.videoHeight) ? ' rot' : '';
-                    const rotDirLabel = (liveState.rotDir === 0) ? ' auto' : (liveState.rotDir === 1 ? ' cw' : ' ccw');
-                    gctx.fillText('LIVE ' + String(liveState.aspectRatio || '9:16') + rotFlag + rotDirLabel + '  ' + state.cols + 'x' + state.rows, 14, 26);
-                    try {
-                        gctx.fillText('canvas ' + W + 'x' + H + ' frame ' + cw + 'x' + ch, 14, 42);
-                    } catch (_) { }
-                    gctx.restore();
-                }
+                gctx.drawImage(liveCoverCanvas, 0, 0, W, H);
                 gctx.imageSmoothingEnabled = true;
                 return;
             }
@@ -2908,7 +2874,6 @@
             bgPixels: null, bgCols: 0, bgRows: 0, bgDiff: 30,
             facingMode: 'user',
             aspectRatio: '9:16', // '9:16' | '4:5' | '1:1' | '3:4' | '16:9'
-            rotDir: 0, // 0=auto, 1=+90 (CW), -1=-90 (CCW)
         };
 
         function getAspectRatioValue(ratioKey) {
@@ -2927,8 +2892,6 @@
 
         const liveOffC = document.createElement('canvas');
         const liveOffX = liveOffC.getContext('2d');
-        const liveRotC = document.createElement('canvas');
-        const liveRotX = liveRotC.getContext('2d');
 
         function getMainAspectRatioFallback() {
             try {
@@ -2954,16 +2917,11 @@
             const idealW = Math.max(320, Math.round(isPortrait ? long * ar : long));
             const idealH = Math.max(320, Math.round(isPortrait ? long : long / ar));
             if (mode === 'mobile') {
-                // Mobile: prefer PORTRAIT capture (avoid manual rotation logic).
-                // Keep aspectRatio "ideal" (not exact) so browser can choose supported sizes.
-                const desiredAR = getAspectRatioValue(liveState.aspectRatio); // width/height, portrait < 1
-                const portraitW = Math.max(360, Math.round(960 * desiredAR)); // e.g. 540 for 9:16
-                const portraitH = 960;
+                // Mobile: don't force aspectRatio (some browsers crop/zoom aggressively)
                 return {
                     facingMode: liveState.facingMode,
-                    width: { ideal: portraitW },
-                    height: { ideal: portraitH },
-                    aspectRatio: { ideal: desiredAR }
+                    width: { ideal: idealW },
+                    height: { ideal: idealH },
                 };
             }
             if (mode === 'tablet') {
@@ -2987,45 +2945,18 @@
             if (!liveVideo.videoWidth) return null;
             const N = liveState.res;
             const vw = liveVideo.videoWidth, vh = liveVideo.videoHeight;
-            // Camera apps: the preview frame has a chosen UI ratio (e.g. 9:16).
-            // We DO NOT crop the camera; we letterbox inside that portrait frame.
-            const mode = getLayoutMode();
-            let desiredAR = getAspectRatioValue(liveState.aspectRatio); // width/height
-            // Force portrait preview on mobile even if user previously cycled to 16:9.
-            // (If desiredAR > 1, flip it so the UI stays portrait.)
-            if (mode === 'mobile' && desiredAR > 1) desiredAR = 1 / desiredAR;
-            const targetRatio = (mode === 'mobile') ? desiredAR : (vw / vh);
+            // Sample based on the CAMERA aspect ratio (no stretch, no forced UI ratio).
+            // This ensures we never "zoom/crop" to fit the UI — we letterbox instead.
+            const targetRatio = vw / vh;
             // Resolution rule: keep total cells ~ N^2 (cols×rows ≈ N²).
             const sqrtR = Math.sqrt(targetRatio);
-            let cols = Math.max(2, Math.round(N * sqrtR));
-            let rows = Math.max(2, Math.round(N / sqrtR));
-            // Safety: on mobile always enforce portrait grid (rows >= cols).
-            if (mode === 'mobile' && cols > rows) {
-                const t = cols; cols = rows; rows = t;
-            }
+            const cols = Math.max(2, Math.round(N * sqrtR));
+            const rows = Math.max(2, Math.round(N / sqrtR));
             liveOffC.width = cols; liveOffC.height = rows;
-            // iOS sometimes delivers frames as landscape dimensions even in portrait UI.
-            // Fix by rotating ONLY when needed (mobile + portrait UI + vw>vh).
-            const wantPortraitUI = (mode === 'mobile') && (window.innerHeight >= window.innerWidth);
-            const rotate90 = wantPortraitUI && (vw > vh);
-            const srcEl = rotate90 ? liveRotC : liveVideo;
-            const sw = rotate90 ? vh : vw;
-            const sh = rotate90 ? vw : vh;
-
-            if (rotate90) {
-                const dir = (liveState.rotDir === 0)
-                    ? (liveState.facingMode === 'user' ? 1 : -1)
-                    : liveState.rotDir;
-                liveRotC.width = sw;
-                liveRotC.height = sh;
-                liveRotX.save();
-                liveRotX.clearRect(0, 0, sw, sh);
-                // Rotate ±90° to convert landscape buffer into portrait buffer
-                liveRotX.translate(sw / 2, sh / 2);
-                liveRotX.rotate(dir * (Math.PI / 2));
-                liveRotX.drawImage(liveVideo, -vw / 2, -vh / 2, vw, vh);
-                liveRotX.restore();
-            }
+            // Do NOT rotate frames here — Safari already provides correctly oriented frames for drawImage().
+            const srcEl = liveVideo;
+            const sw = vw;
+            const sh = vh;
 
             // Contain: show full camera frame (no crop), allow letterbox.
             const scale = Math.min(cols / sw, rows / sh);
@@ -3603,7 +3534,7 @@
         // PWA: register service worker for installability + reliable updates
         (function () {
             if (!('serviceWorker' in navigator)) return;
-            const __BUILD = 'v17';
+            const __BUILD = 'v18';
             try {
                 const bt = document.getElementById('build-tag');
                 if (bt) bt.textContent = __BUILD;
@@ -3637,7 +3568,7 @@
             window.forceAppUpdate = resetServiceWorkerAndReload;
 
             // Versioned SW URL forces Safari to re-fetch updated sw.js
-            const __SW_URL = 'sw.js?v=17';
+            const __SW_URL = 'sw.js?v=18';
             navigator.serviceWorker.register(__SW_URL).then((reg) => {
                 function trySkipWaiting() {
                     if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
