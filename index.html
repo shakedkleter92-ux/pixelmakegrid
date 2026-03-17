@@ -2960,8 +2960,12 @@
             const targetRatio = (mode === 'mobile') ? desiredAR : (vw / vh);
             // Resolution rule: keep total cells ~ N^2 (cols×rows ≈ N²).
             const sqrtR = Math.sqrt(targetRatio);
-            const cols = Math.max(2, Math.round(N * sqrtR));
-            const rows = Math.max(2, Math.round(N / sqrtR));
+            let cols = Math.max(2, Math.round(N * sqrtR));
+            let rows = Math.max(2, Math.round(N / sqrtR));
+            // Safety: on mobile always enforce portrait grid (rows >= cols).
+            if (mode === 'mobile' && cols > rows) {
+                const t = cols; cols = rows; rows = t;
+            }
             liveOffC.width = cols; liveOffC.height = rows;
             const srcEl = liveVideo;
             const sw = vw;
@@ -3543,7 +3547,7 @@
         // PWA: register service worker for installability + reliable updates
         (function () {
             if (!('serviceWorker' in navigator)) return;
-            const __BUILD = 'v12';
+            const __BUILD = 'v13';
             try {
                 const bt = document.getElementById('build-tag');
                 if (bt) bt.textContent = __BUILD;
@@ -3577,7 +3581,7 @@
             window.forceAppUpdate = resetServiceWorkerAndReload;
 
             // Versioned SW URL forces Safari to re-fetch updated sw.js
-            const __SW_URL = 'sw.js?v=12';
+            const __SW_URL = 'sw.js?v=13';
             navigator.serviceWorker.register(__SW_URL).then((reg) => {
                 function trySkipWaiting() {
                     if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
