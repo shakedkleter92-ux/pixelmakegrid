@@ -1791,7 +1791,8 @@
                     gctx.fillRect(8, 8, 220, 44);
                     gctx.fillStyle = '#111';
                     gctx.font = '12px ui-monospace, SFMono-Regular, Menlo, monospace';
-                    gctx.fillText('LIVE ' + String(liveState.aspectRatio || '9:16') + '  ' + state.cols + 'x' + state.rows, 14, 26);
+                    const rotFlag = (window.innerHeight >= window.innerWidth && liveVideo && liveVideo.videoWidth && liveVideo.videoHeight && liveVideo.videoWidth > liveVideo.videoHeight) ? ' rot' : '';
+                    gctx.fillText('LIVE ' + String(liveState.aspectRatio || '9:16') + rotFlag + '  ' + state.cols + 'x' + state.rows, 14, 26);
                     try {
                         gctx.fillText('canvas ' + W + 'x' + H + ' frame ' + cw + 'x' + ch, 14, 42);
                     } catch (_) { }
@@ -2924,6 +2925,8 @@
 
         const liveOffC = document.createElement('canvas');
         const liveOffX = liveOffC.getContext('2d');
+        const liveRotC = document.createElement('canvas');
+        const liveRotX = liveRotC.getContext('2d');
 
         function getMainAspectRatioFallback() {
             try {
@@ -2999,9 +3002,25 @@
                 const t = cols; cols = rows; rows = t;
             }
             liveOffC.width = cols; liveOffC.height = rows;
-            const srcEl = liveVideo;
-            const sw = vw;
-            const sh = vh;
+            // iOS sometimes delivers frames as landscape dimensions even in portrait UI.
+            // Fix by rotating ONLY when needed (mobile + portrait UI + vw>vh).
+            const wantPortraitUI = (mode === 'mobile') && (window.innerHeight >= window.innerWidth);
+            const rotate90 = wantPortraitUI && (vw > vh);
+            const srcEl = rotate90 ? liveRotC : liveVideo;
+            const sw = rotate90 ? vh : vw;
+            const sh = rotate90 ? vw : vh;
+
+            if (rotate90) {
+                liveRotC.width = sw;
+                liveRotC.height = sh;
+                liveRotX.save();
+                liveRotX.clearRect(0, 0, sw, sh);
+                // Rotate +90° to convert landscape buffer into portrait buffer
+                liveRotX.translate(sw / 2, sh / 2);
+                liveRotX.rotate(Math.PI / 2);
+                liveRotX.drawImage(liveVideo, -vw / 2, -vh / 2, vw, vh);
+                liveRotX.restore();
+            }
 
             // Contain: show full camera frame (no crop), allow letterbox.
             const scale = Math.min(cols / sw, rows / sh);
@@ -3579,7 +3598,7 @@
         // PWA: register service worker for installability + reliable updates
         (function () {
             if (!('serviceWorker' in navigator)) return;
-            const __BUILD = 'v14';
+            const __BUILD = 'v15';
             try {
                 const bt = document.getElementById('build-tag');
                 if (bt) bt.textContent = __BUILD;
@@ -3613,7 +3632,7 @@
             window.forceAppUpdate = resetServiceWorkerAndReload;
 
             // Versioned SW URL forces Safari to re-fetch updated sw.js
-            const __SW_URL = 'sw.js?v=14';
+            const __SW_URL = 'sw.js?v=15';
             navigator.serviceWorker.register(__SW_URL).then((reg) => {
                 function trySkipWaiting() {
                     if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
