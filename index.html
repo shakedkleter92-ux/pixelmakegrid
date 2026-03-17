@@ -1745,22 +1745,11 @@
             }
 
             if (isLive) {
-                // Live frame:
-                // - Mobile: force 9:16 (portrait) inside the available area (no stretch, no crop of frame)
-                // - Tablet/Desktop: use the available area ratio
-                // When the panel is open, the available height shrinks; forcing 9:16 can make the preview look tiny.
-                // In that case, follow the available area ratio so the canvas only moves up (doesn't shrink).
-                const forcePortrait = isMobileLayout() && !document.body.classList.contains('panel-open');
-                const targetRatio = forcePortrait ? (9 / 16) : (W / H);
-                var cw, ch;
-                if ((W / H) >= targetRatio) {
-                    ch = Math.max(1, H);
-                    cw = Math.max(1, Math.round(ch * targetRatio));
-                } else {
-                    cw = Math.max(1, W);
-                    ch = Math.max(1, Math.round(cw / targetRatio));
-                }
-                var coverKey = 'frame:' + (forcePortrait ? '9:16' : 'area') + ':' + cw + 'x' + ch;
+                // Live preview: do not stretch the frame.
+                // Render into the full available area; the mosaic itself letterboxes as needed.
+                var cw = Math.max(1, W);
+                var ch = Math.max(1, H);
+                var coverKey = 'screen:' + cw + 'x' + ch;
                 if (!liveCoverCanvas || liveCoverLastRatio !== coverKey) {
                     liveCoverCanvas = document.createElement('canvas');
                     liveCoverLastRatio = coverKey;
@@ -1775,7 +1764,7 @@
                 gctx.fillStyle = state.bg;
                 gctx.fillRect(0, 0, W, H);
                 gctx.imageSmoothingEnabled = false;
-                gctx.drawImage(liveCoverCanvas, Math.round((W - cw) / 2), Math.round((H - ch) / 2), cw, ch);
+                gctx.drawImage(liveCoverCanvas, 0, 0, W, H);
                 gctx.imageSmoothingEnabled = true;
                 return;
             }
@@ -2956,15 +2945,10 @@
             if (!liveVideo.videoWidth) return null;
             const N = liveState.res;
             const vw = liveVideo.videoWidth, vh = liveVideo.videoHeight;
-            // Camera-app behavior: always fit sampling to the actual visible area (#main)
-            // so preview/export/sampling stay aligned across breakpoints.
-            let targetRatio = getAspectRatioValue(liveState.aspectRatio);
-            const mainEl = document.getElementById('main');
-            if (mainEl) {
-                const r = mainEl.getBoundingClientRect();
-                if (r && r.width > 0 && r.height > 0) targetRatio = r.width / r.height;
-            }
-            // פורטרט (9:16, 4:5, 1:1, 3:4). רזולוציה אחידה: כמות תאים ~N² בכל היחסים (cols×rows ≈ N²).
+            // Sample based on the CAMERA aspect ratio (no stretch, no forced UI ratio).
+            // This ensures we never "zoom/crop" to fit the UI — we letterbox instead.
+            const targetRatio = vw / vh;
+            // Resolution rule: keep total cells ~ N^2 (cols×rows ≈ N²).
             const sqrtR = Math.sqrt(targetRatio);
             const cols = Math.max(2, Math.round(N * sqrtR));
             const rows = Math.max(2, Math.round(N / sqrtR));
@@ -2974,11 +2958,8 @@
             const sw = vw;
             const sh = vh;
 
-            // Scale mode:
-            // - contain: no crop (can letterbox) — preferred for mobile per user request
-            // - cover: fill (crops)
-            const scaleMode = getLiveScaleMode();
-            const scale = (scaleMode === 'contain') ? Math.min(cols / sw, rows / sh) : Math.max(cols / sw, rows / sh);
+            // Contain: show full camera frame (no crop), allow letterbox.
+            const scale = Math.min(cols / sw, rows / sh);
             const drawW = sw * scale, drawH = sh * scale;
             const dstX = (cols - drawW) / 2, dstY = (rows - drawH) / 2;
             liveOffX.fillStyle = liveState.bgCol;
