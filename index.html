@@ -1399,8 +1399,8 @@
                 </div>
                 <div class="slider-row">
                     <span class="sl-label">Resolution</span>
-                    <input type="range" id="g-res" min="8" max="200" value="20" />
-                    <span class="sl-val" id="g-res-v">20</span>
+                    <input type="range" id="g-res" min="8" max="200" value="100" />
+                    <span class="sl-val" id="g-res-v">100</span>
                 </div>
                 <div id="custom-controls">
                     <div id="custom-hint">
@@ -1577,7 +1577,7 @@
             painting: false, erasing: false,
             mode: 'draw',
             // image mode
-            srcImage: null, imgRes: 20, imgBg: '#ffffff', imgStrokeCol: '#000000', imgFillCol: '#000000',
+            srcImage: null, imgRes: 100, imgBg: '#ffffff', imgStrokeCol: '#000000', imgFillCol: '#000000',
             imgThreshold: 128, imgBgCut: 220, imgFillCol2: '#ffffff', imgEdge: 0,
             useImageColors: true,
             imageManualGrid: false,
@@ -2860,7 +2860,7 @@
 
         const liveState = {
             stream: null, rafId: null,
-            res: 20, threshold: 132, bgCut: 255, edge: 10,
+            res: 100, threshold: 132, bgCut: 255, edge: 10,
             fillCol: '#000000', fillCol2: '#888888', strokeCol: '#000000', bgCol: '#ffffff',
             mirror: true,
             bgPixels: null, bgCols: 0, bgRows: 0, bgDiff: 30,
@@ -3108,6 +3108,17 @@
                 if (drawOpts) drawOpts.style.display = '';
                 gridCanvas.style.cursor = 'crosshair';
                 state.hideGrid = false;
+                // Ensure Draw always starts from the default grid (fixes Live→Draw carrying huge cols/rows)
+                state.cols = 20;
+                state.rows = 20;
+                state.imageManualGrid = false;
+                const dc = document.getElementById('d-cols');
+                const dr = document.getElementById('d-rows');
+                if (dc) { dc.value = '20'; dc.max = String(Math.max(+dc.max || 200, 20)); }
+                if (dr) { dr.value = '20'; dr.max = String(Math.max(+dr.max || 200, 20)); }
+                const dcv = document.getElementById('d-cols-v'); if (dcv) dcv.textContent = '20';
+                const drv = document.getElementById('d-rows-v'); if (drv) drv.textContent = '20';
+                resetCells();
                 if (window.innerWidth <= 700) {
                     var pan = document.getElementById('panel');
                     var bar = document.getElementById('panel-toggle-bar');
