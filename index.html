@@ -3423,6 +3423,13 @@
 
         async function startCamera() {
             try {
+                // Mobile default: back camera + wide (0.5x if supported)
+                if (isMobileLayout()) {
+                    liveState.facingMode = 'environment';
+                    liveState.mirror = false;
+                    // Set UI immediately; hardware zoom will be applied after stream starts.
+                    setZoomUIValue(0.5);
+                }
                 // Sync Live ratio to breakpoint (single source of truth)
                 liveState.aspectRatio = getLiveTargetRatioKey();
                 liveCoverCanvas = null;
@@ -3444,10 +3451,19 @@
                         __liveZoomCaps = (cap && cap.zoom) ? cap.zoom : null;
                         computeLiveZoomRange();
                         renderZoomTicks();
-                        // If hardware zoom exists, sync slider min/max to device capabilities.
                         try {
-                            const cur = (s && typeof s.zoom === 'number') ? s.zoom : liveState.userZoom;
-                            setZoomUIValue(cur || 1);
+                            // Apply preferred mobile zoom (0.5x) if supported; else use min.
+                            if (isMobileLayout() && __liveZoomCaps && typeof __liveZoomCaps.min === 'number') {
+                                const pref = 0.5;
+                                const zmin = __liveZoomCaps.min;
+                                const zmax = (typeof __liveZoomCaps.max === 'number') ? __liveZoomCaps.max : zmin;
+                                const target = (pref >= zmin && pref <= zmax) ? pref : zmin;
+                                setZoomUIValue(target);
+                                applyHardwareZoomIfPossible(target);
+                            } else {
+                                const cur = (s && typeof s.zoom === 'number') ? s.zoom : liveState.userZoom;
+                                setZoomUIValue(cur || 1);
+                            }
                         } catch (_) { }
                         __liveTrackDebug = { settings: s, constraints: c, capabilities: cap };
                     } else {
@@ -3972,7 +3988,7 @@
         // PWA: register service worker for installability + reliable updates
         (function () {
             if (!('serviceWorker' in navigator)) return;
-            const __BUILD = 'v43';
+            const __BUILD = 'v44';
             try {
                 const bt = document.getElementById('build-tag');
                 if (bt) bt.textContent = __BUILD;
@@ -4006,7 +4022,7 @@
             window.forceAppUpdate = resetServiceWorkerAndReload;
 
             // Versioned SW URL forces Safari to re-fetch updated sw.js
-            const __SW_URL = 'sw.js?v=44';
+            const __SW_URL = 'sw.js?v=45';
             navigator.serviceWorker.register(__SW_URL).then((reg) => {
                 function trySkipWaiting() {
                     if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
