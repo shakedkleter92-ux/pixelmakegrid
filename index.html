@@ -794,6 +794,12 @@
         #mob-mode-header .mob-fm-btn.active {
             background: var(--text);
             color: var(--bg);
+            -webkit-text-fill-color: var(--bg);
+        }
+
+        #mob-mode-header .mob-fm-btn.active>span {
+            color: var(--bg);
+            -webkit-text-fill-color: var(--bg);
         }
 
         /* ───── Mobile bottom bar & panel toggle ───── */
@@ -1530,8 +1536,7 @@
     </div>
     <!-- Mobile bottom bar -->
     <div id="panel-toggle-bar">
-        <span>Pixel Maker <span id="build-tag"
-                style="opacity:.65; font-size:11px; margin-left:6px;">v38</span></span>
+        <span>Pixel Maker</span>
         <button id="panel-toggle-btn" aria-label="Toggle controls">☰</button>
     </div>
 
@@ -1970,35 +1975,6 @@
                 gctx.fillRect(0, 0, W, H);
                 gctx.imageSmoothingEnabled = false;
                 gctx.drawImage(liveCoverCanvas, dx, dy, cw, ch);
-                // Debug overlay for Live sizing/orientation on device
-                if (isMobileLayout() && __liveDebug) {
-                    try {
-                        gctx.save();
-                        gctx.fillStyle = 'rgba(255,255,255,0.78)';
-                        gctx.fillRect(8, 8, 360, 98);
-                        gctx.fillStyle = '#111';
-                        gctx.font = '12px ui-monospace, SFMono-Regular, Menlo, monospace';
-                        const d = __liveDebug;
-                        gctx.fillText(`frame ${cw}x${ch} (target ${String(getLiveTargetRatioKey())})`, 14, 26);
-                        gctx.fillText(`video ${d.vw}x${d.vh} draw ${d.drawW}x${d.drawH} ${getLiveScaleMode()}`, 14, 44);
-                        if (__liveTrackDebug && __liveTrackDebug.settings) {
-                            const s = __liveTrackDebug.settings;
-                            const z = (s.zoom != null) ? ` zoom:${s.zoom}` : '';
-                            const af = (s.focusMode || s.focusDistance) ? ` focus:${s.focusMode || s.focusDistance}` : '';
-                            gctx.fillText(`track ${s.width || '?'}x${s.height || '?'} fps:${s.frameRate || '?'}${z}${af}`, 14, 62);
-                        } else {
-                            gctx.fillText(`track (no settings)`, 14, 62);
-                        }
-                        if (__liveTrackDebug && __liveTrackDebug.constraints) {
-                            const cc = __liveTrackDebug.constraints;
-                            const ar = (cc.aspectRatio && (cc.aspectRatio.ideal || cc.aspectRatio)) ? (cc.aspectRatio.ideal || cc.aspectRatio) : '';
-                            gctx.fillText(`req ar:${ar} w:${cc.width?.ideal || cc.width || ''} h:${cc.height?.ideal || cc.height || ''}`, 14, 80);
-                        } else {
-                            gctx.fillText(`req (no constraints)`, 14, 80);
-                        }
-                        gctx.restore();
-                    } catch (_) { }
-                }
                 gctx.imageSmoothingEnabled = true;
                 return;
             }
@@ -3980,7 +3956,7 @@
         // PWA: register service worker for installability + reliable updates
         (function () {
             if (!('serviceWorker' in navigator)) return;
-            const __BUILD = 'v38';
+            const __BUILD = 'v39';
             try {
                 const bt = document.getElementById('build-tag');
                 if (bt) bt.textContent = __BUILD;
@@ -4014,7 +3990,7 @@
             window.forceAppUpdate = resetServiceWorkerAndReload;
 
             // Versioned SW URL forces Safari to re-fetch updated sw.js
-            const __SW_URL = 'sw.js?v=38';
+            const __SW_URL = 'sw.js?v=39';
             navigator.serviceWorker.register(__SW_URL).then((reg) => {
                 function trySkipWaiting() {
                     if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
