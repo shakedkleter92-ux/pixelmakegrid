@@ -1443,7 +1443,7 @@
     <!-- Mobile bottom bar -->
     <div id="panel-toggle-bar">
         <span>Pixel Maker <span id="build-tag"
-                style="opacity:.65; font-size:11px; margin-left:6px;">v24</span></span>
+                style="opacity:.65; font-size:11px; margin-left:6px;">v25</span></span>
         <button id="panel-toggle-btn" aria-label="Toggle controls">☰</button>
     </div>
 
@@ -1875,6 +1875,20 @@
                 gctx.fillRect(0, 0, W, H);
                 gctx.imageSmoothingEnabled = false;
                 gctx.drawImage(liveCoverCanvas, dx, dy, cw, ch);
+                // Debug overlay for Live sizing/orientation on device
+                if (isMobileLayout() && __liveDebug) {
+                    try {
+                        gctx.save();
+                        gctx.fillStyle = 'rgba(255,255,255,0.78)';
+                        gctx.fillRect(8, 8, 300, 58);
+                        gctx.fillStyle = '#111';
+                        gctx.font = '12px ui-monospace, SFMono-Regular, Menlo, monospace';
+                        const d = __liveDebug;
+                        gctx.fillText(`frame ${cw}x${ch} (target ${String(getLiveTargetRatioKey())})`, 14, 26);
+                        gctx.fillText(`video ${d.vw}x${d.vh} draw ${d.drawW}x${d.drawH} rot:${d.needsRotate}`, 14, 44);
+                        gctx.restore();
+                    } catch (_) { }
+                }
                 gctx.imageSmoothingEnabled = true;
                 return;
             }
@@ -3018,6 +3032,7 @@
         const liveOffX = liveOffC.getContext('2d');
         const liveRotC = document.createElement('canvas');
         const liveRotX = liveRotC.getContext('2d');
+        let __liveDebug = null;
 
         function isIOSSafari() {
             const ua = navigator.userAgent || '';
@@ -3122,6 +3137,7 @@
             const scale = Math.min(cols / sw, rows / sh);
             const drawW = sw * scale, drawH = sh * scale;
             const dstX = (cols - drawW) / 2, dstY = (rows - drawH) / 2;
+            __liveDebug = { vw, vh, sw, sh, cols, rows, drawW: Math.round(drawW), drawH: Math.round(drawH), dstX: Math.round(dstX), dstY: Math.round(dstY), needsRotate: !!needsRotate, target: targetRatio };
             liveOffX.fillStyle = liveState.bgCol;
             liveOffX.fillRect(0, 0, cols, rows);
             if (liveState.mirror) {
@@ -3701,7 +3717,7 @@
         // PWA: register service worker for installability + reliable updates
         (function () {
             if (!('serviceWorker' in navigator)) return;
-            const __BUILD = 'v24';
+            const __BUILD = 'v25';
             try {
                 const bt = document.getElementById('build-tag');
                 if (bt) bt.textContent = __BUILD;
@@ -3735,7 +3751,7 @@
             window.forceAppUpdate = resetServiceWorkerAndReload;
 
             // Versioned SW URL forces Safari to re-fetch updated sw.js
-            const __SW_URL = 'sw.js?v=24';
+            const __SW_URL = 'sw.js?v=25';
             navigator.serviceWorker.register(__SW_URL).then((reg) => {
                 function trySkipWaiting() {
                     if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
