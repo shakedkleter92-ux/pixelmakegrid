@@ -1588,7 +1588,7 @@
     <div id="app">
         <aside id="panel">
             <div id="panel-header">
-                <h1>Pixelart Maker</h1>
+                <h1>Pixel Art Maker</h1>
             </div>
 
             <!-- Mode switch (desktop): keep first in panel -->
@@ -1661,7 +1661,7 @@
             </div>
 
             <!-- 04 Fill -->
-            <div class="section">
+            <div class="section" id="fill-section">
                 <!-- Draw options -->
                 <div id="draw-options">
                     <div class="palette-row">
@@ -3530,8 +3530,11 @@
             if (imgOpts) imgOpts.style.display = 'none';
             if (liveOpts) liveOpts.style.display = 'none';
             var gridSection = document.getElementById('grid-section');
+            var fillSection = document.getElementById('fill-section');
             // Hide Grid in Live + Upload (image): resolution slider already controls it
             if (gridSection) gridSection.style.display = (mode === 'live' || mode === 'image') ? 'none' : '';
+            // Hide Fill section in Live + Upload (prevents empty separators/boxes)
+            if (fillSection) fillSection.style.display = (mode === 'draw') ? '' : 'none';
             // In Live/Upload we hide Grid section, so renumber Palette to 02 (otherwise keep 03)
             var palNum = document.querySelector('#palette-section .sec-num');
             if (palNum) palNum.textContent = (mode === 'live' || mode === 'image') ? '02' : '03';
@@ -3974,7 +3977,7 @@
         // PWA: register service worker for installability + reliable updates
         (function () {
             if (!('serviceWorker' in navigator)) return;
-            const __BUILD = 'v41';
+            const __BUILD = 'v42';
             try {
                 const bt = document.getElementById('build-tag');
                 if (bt) bt.textContent = __BUILD;
@@ -4008,7 +4011,7 @@
             window.forceAppUpdate = resetServiceWorkerAndReload;
 
             // Versioned SW URL forces Safari to re-fetch updated sw.js
-            const __SW_URL = 'sw.js?v=42';
+            const __SW_URL = 'sw.js?v=43';
             navigator.serviceWorker.register(__SW_URL).then((reg) => {
                 function trySkipWaiting() {
                     if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
