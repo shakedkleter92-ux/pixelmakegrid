@@ -1443,7 +1443,7 @@
     <!-- Mobile bottom bar -->
     <div id="panel-toggle-bar">
         <span>Pixel Maker <span id="build-tag"
-                style="opacity:.65; font-size:11px; margin-left:6px;">v30</span></span>
+                style="opacity:.65; font-size:11px; margin-left:6px;">v31</span></span>
         <button id="panel-toggle-btn" aria-label="Toggle controls">☰</button>
     </div>
 
@@ -3014,6 +3014,7 @@
             bgPixels: null, bgCols: 0, bgRows: 0, bgDiff: 30,
             facingMode: 'user',
             aspectRatio: '9:16',
+            userZoom: 1, // user-controlled zoom (hardware if available, else software)
         };
 
         // Single source of truth: target preview ratio by breakpoint.
@@ -3050,6 +3051,42 @@
         const liveRotX = liveRotC.getContext('2d');
         let __liveDebug = null;
         let __liveTrackDebug = null;
+        let __liveZoomCaps = null;
+
+        function ensureLiveOptionsUI() {
+            const box = document.getElementById('live-options');
+            if (!box) return;
+            if (box.__wired) return;
+            box.__wired = true;
+            box.innerHTML = `
+              <div class="slider-row">
+                <span class="sl-label">Zoom</span>
+                <input type="range" id="live-zoom" min="0.5" max="2" step="0.01" value="1" />
+                <span class="sl-val" id="live-zoom-v">1.00</span>
+              </div>
+            `;
+            const z = document.getElementById('live-zoom');
+            const zv = document.getElementById('live-zoom-v');
+            if (z) {
+                z.addEventListener('input', () => {
+                    const val = Math.max(0.1, Math.min(3, parseFloat(z.value || '1') || 1));
+                    liveState.userZoom = val;
+                    if (zv) zv.textContent = val.toFixed(2);
+                    // Try hardware zoom if supported and within bounds
+                    try {
+                        const vt = liveState.stream && liveState.stream.getVideoTracks ? liveState.stream.getVideoTracks()[0] : null;
+                        const caps = __liveZoomCaps;
+                        if (vt && caps && typeof vt.applyConstraints === 'function') {
+                            const zmin = (typeof caps.min === 'number') ? caps.min : 1;
+                            const zmax = (typeof caps.max === 'number') ? caps.max : 1;
+                            if (val >= zmin && val <= zmax) {
+                                vt.applyConstraints({ advanced: [{ zoom: val }] }).catch(() => { });
+                            }
+                        }
+                    } catch (_) { }
+                });
+            }
+        }
 
         function isIOSSafari() {
             const ua = navigator.userAgent || '';
@@ -3154,12 +3191,18 @@
             const scaleMode = getLiveScaleMode();
             const containScale = Math.min(cols / sw, rows / sh);
             const coverScale = Math.max(cols / sw, rows / sh);
-            // "Soft cover" on mobile to reduce perceived zoom: interpolate between contain and cover.
-            // 0 = contain (no crop), 1 = cover (full fill). We pick a middle ground.
-            const softCover = isMobileLayout() ? 0.65 : 1;
-            let scale = (scaleMode === 'cover')
-                ? (containScale + (coverScale - containScale) * softCover)
-                : containScale;
+            // Zoom behavior:
+            // - If cover: 1.0 = cover fill, <1 interpolates toward contain (less crop, may show borders),
+            //   >1 adds extra zoom-in on top of cover.
+            // - If contain: we still honor zoom (>1 zooms in, <1 zooms out with borders).
+            const z = Math.max(0.5, Math.min(2.5, liveState.userZoom || 1));
+            let scale;
+            if (scaleMode === 'cover') {
+                if (z >= 1) scale = coverScale * z;
+                else scale = containScale + (coverScale - containScale) * z; // z in (0.5..1)
+            } else {
+                scale = containScale * z;
+            }
             const drawW = sw * scale, drawH = sh * scale;
             const dstX = (cols - drawW) / 2, dstY = (rows - drawH) / 2;
             __liveDebug = { vw, vh, sw, sh, cols, rows, drawW: Math.round(drawW), drawH: Math.round(drawH), dstX: Math.round(dstX), dstY: Math.round(dstY), needsRotate: !!needsRotate, target: targetRatio };
@@ -3228,6 +3271,7 @@
                 liveState.aspectRatio = getLiveTargetRatioKey();
                 liveCoverCanvas = null;
                 liveCoverLastRatio = null;
+                ensureLiveOptionsUI();
 
                 liveState.stream = await navigator.mediaDevices.getUserMedia({
                     video: getLiveVideoConstraints(), audio: false
@@ -3240,6 +3284,24 @@
                         const s = (typeof vt.getSettings === 'function') ? vt.getSettings() : null;
                         const c = (typeof vt.getConstraints === 'function') ? vt.getConstraints() : null;
                         const cap = (typeof vt.getCapabilities === 'function') ? vt.getCapabilities() : null;
+                        __liveZoomCaps = (cap && cap.zoom) ? cap.zoom : null;
+                        // If hardware zoom exists, sync slider min/max to device capabilities.
+                        try {
+                            const zEl = document.getElementById('live-zoom');
+                            const zVEl = document.getElementById('live-zoom-v');
+                            if (zEl && __liveZoomCaps) {
+                                const zmin = (typeof __liveZoomCaps.min === 'number') ? __liveZoomCaps.min : 1;
+                                const zmax = (typeof __liveZoomCaps.max === 'number') ? __liveZoomCaps.max : 1;
+                                const zstep = (typeof __liveZoomCaps.step === 'number') ? __liveZoomCaps.step : 0.1;
+                                zEl.min = String(Math.max(0.5, zmin));
+                                zEl.max = String(Math.max(zEl.min, zmax));
+                                zEl.step = String(Math.max(0.01, zstep));
+                                const cur = (s && typeof s.zoom === 'number') ? s.zoom : liveState.userZoom;
+                                liveState.userZoom = cur || 1;
+                                zEl.value = String(liveState.userZoom);
+                                if (zVEl) zVEl.textContent = (liveState.userZoom).toFixed(2);
+                            }
+                        } catch (_) { }
                         __liveTrackDebug = { settings: s, constraints: c, capabilities: cap };
                     } else {
                         __liveTrackDebug = null;
@@ -3753,7 +3815,7 @@
         // PWA: register service worker for installability + reliable updates
         (function () {
             if (!('serviceWorker' in navigator)) return;
-            const __BUILD = 'v30';
+            const __BUILD = 'v31';
             try {
                 const bt = document.getElementById('build-tag');
                 if (bt) bt.textContent = __BUILD;
@@ -3787,7 +3849,7 @@
             window.forceAppUpdate = resetServiceWorkerAndReload;
 
             // Versioned SW URL forces Safari to re-fetch updated sw.js
-            const __SW_URL = 'sw.js?v=30';
+            const __SW_URL = 'sw.js?v=31';
             navigator.serviceWorker.register(__SW_URL).then((reg) => {
                 function trySkipWaiting() {
                     if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });

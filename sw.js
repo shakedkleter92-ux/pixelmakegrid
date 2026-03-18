@@ -1,5 +1,5 @@
 // Minimal service worker so the app can be installed (PWA)
-const CACHE = 'pixel-maker-v30';
+const CACHE = 'pixel-maker-v31';
 
 self.addEventListener('install', (e) => {
   e.waitUntil(
