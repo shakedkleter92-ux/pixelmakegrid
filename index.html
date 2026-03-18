@@ -1443,7 +1443,7 @@
     <!-- Mobile bottom bar -->
     <div id="panel-toggle-bar">
         <span>Pixel Maker <span id="build-tag"
-                style="opacity:.65; font-size:11px; margin-left:6px;">v26</span></span>
+                style="opacity:.65; font-size:11px; margin-left:6px;">v27</span></span>
         <button id="panel-toggle-btn" aria-label="Toggle controls">☰</button>
     </div>
 
@@ -1881,12 +1881,27 @@
                     try {
                         gctx.save();
                         gctx.fillStyle = 'rgba(255,255,255,0.78)';
-                        gctx.fillRect(8, 8, 300, 58);
+                        gctx.fillRect(8, 8, 360, 98);
                         gctx.fillStyle = '#111';
                         gctx.font = '12px ui-monospace, SFMono-Regular, Menlo, monospace';
                         const d = __liveDebug;
                         gctx.fillText(`frame ${cw}x${ch} (target ${String(getLiveTargetRatioKey())})`, 14, 26);
-                        gctx.fillText(`video ${d.vw}x${d.vh} draw ${d.drawW}x${d.drawH} rot:${d.needsRotate}`, 14, 44);
+                        gctx.fillText(`video ${d.vw}x${d.vh} draw ${d.drawW}x${d.drawH} ${getLiveScaleMode()}`, 14, 44);
+                        if (__liveTrackDebug && __liveTrackDebug.settings) {
+                            const s = __liveTrackDebug.settings;
+                            const z = (s.zoom != null) ? ` zoom:${s.zoom}` : '';
+                            const af = (s.focusMode || s.focusDistance) ? ` focus:${s.focusMode || s.focusDistance}` : '';
+                            gctx.fillText(`track ${s.width || '?'}x${s.height || '?'} fps:${s.frameRate || '?'}${z}${af}`, 14, 62);
+                        } else {
+                            gctx.fillText(`track (no settings)`, 14, 62);
+                        }
+                        if (__liveTrackDebug && __liveTrackDebug.constraints) {
+                            const cc = __liveTrackDebug.constraints;
+                            const ar = (cc.aspectRatio && (cc.aspectRatio.ideal || cc.aspectRatio)) ? (cc.aspectRatio.ideal || cc.aspectRatio) : '';
+                            gctx.fillText(`req ar:${ar} w:${cc.width?.ideal || cc.width || ''} h:${cc.height?.ideal || cc.height || ''}`, 14, 80);
+                        } else {
+                            gctx.fillText(`req (no constraints)`, 14, 80);
+                        }
                         gctx.restore();
                     } catch (_) { }
                 }
@@ -3034,6 +3049,7 @@
         const liveRotC = document.createElement('canvas');
         const liveRotX = liveRotC.getContext('2d');
         let __liveDebug = null;
+        let __liveTrackDebug = null;
 
         function isIOSSafari() {
             const ua = navigator.userAgent || '';
@@ -3211,6 +3227,17 @@
                 });
                 liveVideo.srcObject = liveState.stream;
                 await liveVideo.play();
+                try {
+                    const vt = liveState.stream && liveState.stream.getVideoTracks ? liveState.stream.getVideoTracks()[0] : null;
+                    if (vt) {
+                        const s = (typeof vt.getSettings === 'function') ? vt.getSettings() : null;
+                        const c = (typeof vt.getConstraints === 'function') ? vt.getConstraints() : null;
+                        const cap = (typeof vt.getCapabilities === 'function') ? vt.getCapabilities() : null;
+                        __liveTrackDebug = { settings: s, constraints: c, capabilities: cap };
+                    } else {
+                        __liveTrackDebug = null;
+                    }
+                } catch (_) { __liveTrackDebug = null; }
                 liveState.rafId = requestAnimationFrame(liveLoop);
             } catch (err) {
                 alert('Camera error: ' + err.message);
@@ -3719,7 +3746,7 @@
         // PWA: register service worker for installability + reliable updates
         (function () {
             if (!('serviceWorker' in navigator)) return;
-            const __BUILD = 'v26';
+            const __BUILD = 'v27';
             try {
                 const bt = document.getElementById('build-tag');
                 if (bt) bt.textContent = __BUILD;
@@ -3753,7 +3780,7 @@
             window.forceAppUpdate = resetServiceWorkerAndReload;
 
             // Versioned SW URL forces Safari to re-fetch updated sw.js
-            const __SW_URL = 'sw.js?v=26';
+            const __SW_URL = 'sw.js?v=27';
             navigator.serviceWorker.register(__SW_URL).then((reg) => {
                 function trySkipWaiting() {
                     if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
