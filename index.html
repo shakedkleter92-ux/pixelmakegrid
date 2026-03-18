@@ -1443,7 +1443,7 @@
     <!-- Mobile bottom bar -->
     <div id="panel-toggle-bar">
         <span>Pixel Maker <span id="build-tag"
-                style="opacity:.65; font-size:11px; margin-left:6px;">v27</span></span>
+                style="opacity:.65; font-size:11px; margin-left:6px;">v28</span></span>
         <button id="panel-toggle-btn" aria-label="Toggle controls">☰</button>
     </div>
 
@@ -3152,7 +3152,14 @@
             }
 
             const scaleMode = getLiveScaleMode();
-            const scale = (scaleMode === 'cover') ? Math.max(cols / sw, rows / sh) : Math.min(cols / sw, rows / sh);
+            const containScale = Math.min(cols / sw, rows / sh);
+            const coverScale = Math.max(cols / sw, rows / sh);
+            // "Soft cover" on mobile to reduce perceived zoom: interpolate between contain and cover.
+            // 0 = contain (no crop), 1 = cover (full fill). We pick a middle ground.
+            const softCover = isMobileLayout() ? 0.65 : 1;
+            const scale = (scaleMode === 'cover')
+                ? (containScale + (coverScale - containScale) * softCover)
+                : containScale;
             const drawW = sw * scale, drawH = sh * scale;
             const dstX = (cols - drawW) / 2, dstY = (rows - drawH) / 2;
             __liveDebug = { vw, vh, sw, sh, cols, rows, drawW: Math.round(drawW), drawH: Math.round(drawH), dstX: Math.round(dstX), dstY: Math.round(dstY), needsRotate: !!needsRotate, target: targetRatio };
@@ -3746,7 +3753,7 @@
         // PWA: register service worker for installability + reliable updates
         (function () {
             if (!('serviceWorker' in navigator)) return;
-            const __BUILD = 'v27';
+            const __BUILD = 'v28';
             try {
                 const bt = document.getElementById('build-tag');
                 if (bt) bt.textContent = __BUILD;
@@ -3780,7 +3787,7 @@
             window.forceAppUpdate = resetServiceWorkerAndReload;
 
             // Versioned SW URL forces Safari to re-fetch updated sw.js
-            const __SW_URL = 'sw.js?v=27';
+            const __SW_URL = 'sw.js?v=28';
             navigator.serviceWorker.register(__SW_URL).then((reg) => {
                 function trySkipWaiting() {
                     if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
