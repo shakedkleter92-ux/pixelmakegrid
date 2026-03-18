@@ -466,6 +466,12 @@
             touch-action: manipulation;
         }
 
+        /* iOS sometimes tints button text blue — force monochrome UI */
+        button {
+            color: var(--text);
+            -webkit-text-fill-color: var(--text);
+        }
+
         .btn:active,
         .fm-btn:active,
         .shape-btn:active,
@@ -1320,7 +1326,7 @@
         /* Live zoom FAB — bottom-right (Live only) */
         #mob-zoom {
             position: fixed;
-            width: 56px;
+            width: 44px;
             height: 44px;
             bottom: 86px;
             right: 20px;
@@ -1328,25 +1334,28 @@
             cursor: pointer;
             border: 1px solid var(--border);
             background: var(--bg);
-            font-size: 12px;
+            font-size: 10px;
             font-weight: 800;
             letter-spacing: .03em;
             text-transform: uppercase;
             font-family: 'IBM Plex Mono', monospace;
-            color: var(--text);
+            color: var(--text) !important;
+            -webkit-text-fill-color: var(--text);
             z-index: 140;
             display: flex;
             align-items: center;
             justify-content: center;
             padding: 0;
+            -webkit-appearance: none;
+            appearance: none;
         }
 
         #mob-zoom-pop {
             position: fixed;
             right: 20px;
             bottom: 136px;
-            width: 160px;
-            padding: 10px;
+            width: 96px;
+            padding: 8px;
             border: 1px solid var(--border);
             background: rgba(255, 255, 255, 0.92);
             backdrop-filter: blur(10px);
@@ -1357,20 +1366,25 @@
         #mob-zoom-ticks {
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 8px;
         }
 
         #mob-zoom-ticks button {
             width: 100%;
-            padding: 10px 0;
+            height: 44px;
+            padding: 0;
             border: 1px solid var(--border);
             background: var(--bg);
             font-family: 'IBM Plex Mono', monospace;
-            font-size: 11px;
+            font-size: 10px;
             font-weight: 800;
             letter-spacing: .08em;
             text-transform: uppercase;
             cursor: pointer;
+            color: var(--text) !important;
+            -webkit-text-fill-color: var(--text);
+            -webkit-appearance: none;
+            appearance: none;
         }
 
         /* Desktop: show floating undo outside panel (Draw) */
@@ -1502,7 +1516,7 @@
     <!-- Mobile bottom bar -->
     <div id="panel-toggle-bar">
         <span>Pixel Maker <span id="build-tag"
-                style="opacity:.65; font-size:11px; margin-left:6px;">v35</span></span>
+                style="opacity:.65; font-size:11px; margin-left:6px;">v36</span></span>
         <button id="panel-toggle-btn" aria-label="Toggle controls">☰</button>
     </div>
 
@@ -3937,7 +3951,7 @@
         // PWA: register service worker for installability + reliable updates
         (function () {
             if (!('serviceWorker' in navigator)) return;
-            const __BUILD = 'v35';
+            const __BUILD = 'v36';
             try {
                 const bt = document.getElementById('build-tag');
                 if (bt) bt.textContent = __BUILD;
@@ -3971,7 +3985,7 @@
             window.forceAppUpdate = resetServiceWorkerAndReload;
 
             // Versioned SW URL forces Safari to re-fetch updated sw.js
-            const __SW_URL = 'sw.js?v=35';
+            const __SW_URL = 'sw.js?v=36';
             navigator.serviceWorker.register(__SW_URL).then((reg) => {
                 function trySkipWaiting() {
                     if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
