@@ -1443,7 +1443,7 @@
     <!-- Mobile bottom bar -->
     <div id="panel-toggle-bar">
         <span>Pixel Maker <span id="build-tag"
-                style="opacity:.65; font-size:11px; margin-left:6px;">v23</span></span>
+                style="opacity:.65; font-size:11px; margin-left:6px;">v24</span></span>
         <button id="panel-toggle-btn" aria-label="Toggle controls">☰</button>
     </div>
 
@@ -3019,6 +3019,16 @@
         const liveRotC = document.createElement('canvas');
         const liveRotX = liveRotC.getContext('2d');
 
+        function isIOSSafari() {
+            const ua = navigator.userAgent || '';
+            const isIOS = /iPad|iPhone|iPod/i.test(ua);
+            const isWebKit = /WebKit/i.test(ua);
+            const isCriOS = /CriOS/i.test(ua);
+            const isFxiOS = /FxiOS/i.test(ua);
+            const isSafari = isWebKit && /Safari/i.test(ua) && !isCriOS && !isFxiOS;
+            return isIOS && isSafari;
+        }
+
         function getScreenOrientationAngle() {
             // Prefer Screen Orientation API, fall back to legacy iOS window.orientation
             try {
@@ -3089,7 +3099,9 @@
             // Always "contain": show the full camera frame (no crop) inside the target frame.
             // If iOS delivers a landscape buffer while UI is portrait, rotate for sampling.
             const wantPortraitUI = (targetRatio < 1) && (window.innerHeight >= window.innerWidth);
-            const needsRotate = wantPortraitUI && (vw > vh);
+            // iOS Safari already applies rotation metadata when drawing the <video> element to canvas.
+            // Rotating again causes a 90° sideways preview.
+            const needsRotate = !isIOSSafari() && wantPortraitUI && (vw > vh);
             let srcEl = liveVideo;
             let sw = vw, sh = vh;
             if (needsRotate) {
@@ -3689,7 +3701,7 @@
         // PWA: register service worker for installability + reliable updates
         (function () {
             if (!('serviceWorker' in navigator)) return;
-            const __BUILD = 'v23';
+            const __BUILD = 'v24';
             try {
                 const bt = document.getElementById('build-tag');
                 if (bt) bt.textContent = __BUILD;
@@ -3723,7 +3735,7 @@
             window.forceAppUpdate = resetServiceWorkerAndReload;
 
             // Versioned SW URL forces Safari to re-fetch updated sw.js
-            const __SW_URL = 'sw.js?v=23';
+            const __SW_URL = 'sw.js?v=24';
             navigator.serviceWorker.register(__SW_URL).then((reg) => {
                 function trySkipWaiting() {
                     if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
