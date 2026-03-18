@@ -3170,6 +3170,10 @@
             facingMode: 'user',
             aspectRatio: '9:16',
             userZoom: 1, // user-controlled zoom (hardware if available, else software)
+            userSetFacing: false,
+            didSetMobileFacingDefault: false,
+            didSetMobileZoomDefault: false,
+            didApplyMobileHardwareZoomDefault: false,
         };
 
         // Single source of truth: target preview ratio by breakpoint.
@@ -3495,12 +3499,16 @@
 
         async function startCamera() {
             try {
-                // Mobile default: back camera + wide (0.5x if supported)
-                if (isMobileLayout()) {
+                // Mobile defaults (apply once, don't override user flip/zoom)
+                if (isMobileLayout() && !liveState.userSetFacing && !liveState.didSetMobileFacingDefault) {
                     liveState.facingMode = 'environment';
                     liveState.mirror = false;
+                    liveState.didSetMobileFacingDefault = true;
+                }
+                if (isMobileLayout() && !liveState.didSetMobileZoomDefault) {
                     // Set UI immediately; hardware zoom will be applied after stream starts.
                     setZoomUIValue(0.5);
+                    liveState.didSetMobileZoomDefault = true;
                 }
                 // Sync Live ratio to breakpoint (single source of truth)
                 liveState.aspectRatio = getLiveTargetRatioKey();
@@ -3524,14 +3532,15 @@
                         computeLiveZoomRange();
                         renderZoomTicks();
                         try {
-                            // Apply preferred mobile zoom (0.5x) if supported; else use min.
-                            if (isMobileLayout() && __liveZoomCaps && typeof __liveZoomCaps.min === 'number') {
+                            // Apply preferred mobile zoom (0.5x) once; else keep current.
+                            if (isMobileLayout() && !liveState.didApplyMobileHardwareZoomDefault && __liveZoomCaps && typeof __liveZoomCaps.min === 'number') {
                                 const pref = 0.5;
                                 const zmin = __liveZoomCaps.min;
                                 const zmax = (typeof __liveZoomCaps.max === 'number') ? __liveZoomCaps.max : zmin;
                                 const target = (pref >= zmin && pref <= zmax) ? pref : zmin;
                                 setZoomUIValue(target);
                                 applyHardwareZoomIfPossible(target);
+                                liveState.didApplyMobileHardwareZoomDefault = true;
                             } else {
                                 const cur = (s && typeof s.zoom === 'number') ? s.zoom : liveState.userZoom;
                                 setZoomUIValue(cur || 1);
@@ -3796,6 +3805,7 @@
         // Camera flip
         function flipCamera() {
             if (state.mode !== 'live') return;
+            liveState.userSetFacing = true;
             liveState.facingMode = liveState.facingMode === 'user' ? 'environment' : 'user';
             liveState.mirror = (liveState.facingMode === 'user');
             stopCamera();
